@@ -1,204 +1,112 @@
-# XSLOPE 🏗️
+# GeoPerfil 2D v0.8.5 — Correccion MiniCAD, guitarra y personalizacion de unidades
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.9%2B-3776AB?style=for-the-badge&logo=python" alt="Python 3.9+" />
-  <img src="https://img.shields.io/badge/Docs-xslope.org-2b6cb0?style=for-the-badge" alt="Documentation" />
-  <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="Apache 2.0" />
-</p>
+Aplicacion Python/Streamlit para dibujar perfiles geologicos manualmente a partir de sondeos y ensayos de campo. La geologia se interpreta mediante contactos y lentejones en el MiniCAD; los ensayos no generan correlaciones geologicas automaticas.
 
-<h2 align="center">
-  Documentación, tutoriales y videos: <a href="https://xslope.org"><b>xslope.org</b></a>
-</h2>
+## Importacion unica: libros originales de campana
 
-`xslope` es un paquete de Python de código abierto para el análisis de estabilidad de taludes y flujo de filtración en geotecnia. Responde a la pregunta central de un ingeniero geotécnico en cada corte, terraplén, presa o dique: ¿este talud es estable y con qué margen de seguridad?
+- **Importacion simultanea de varios archivos Excel**: `PERFIL1.xlsx` define PK y cotas reales, `BKFL.XLSX` litologias, `DPRG.XLSX` penetracion dinamica, `ISPT.XLSX` SPT y `ListadoLab.XLSX` laboratorio.
+- Reconocimiento por **cabeceras del archivo**, no por nombre literal. PERFIL1 es obligatorio; los cuatro restantes son opcionales. Para un perfil geologico dibujable es necesario al menos BKFL.
+- Interfaz de **validar antes de aplicar**. Se informa del numero de sondeos, curvas, ensayos y muestras; el usuario confirma expresamente antes de sustituir la campana o descartar contactos anteriores.
+- La columna **Cota** de PERFIL1 indica la elevacion real de cada punto (m). Cero es valido; vacio es error. La columna **Distancia** es el PK acumulado (m). **STA es un punto topografico del terreno**, no un sondeo, penetracion ni otro trabajo de campo. Su PK y su cota forman parte de la superficie del perfil.
+- La topografia observada procede de **todos los puntos de PERFIL1**, incluido STA, sin inventar cotas fuera del primer y ultimo punto; entre PK se interpola linealmente.
+- Los intervalos BKFL se conservan con estrato, descripcion y origen. Los codigos `EST_*` no se equiparan automaticamente a unidades geotecnicas `UG-*` del laboratorio.
+- DPRG conserva los golpes originales separados por profundidad de 0,20 m; **el subtipo de penetracion debe confirmarse**. No interpreta rechazo ni convierte los golpes en SPT. La tabla interna se denomina `Ensayos_DPSH` por compatibilidad con v0.7, aunque se registra el tipo como `PENETROMETRO (subtipo no confirmado)`.
+- Los SPT se muestran como **`SPT 24/13/4/4`** a su cota, sin reemplazar los incrementos por N. Se deduplican los SPT presentes tanto en ISPT como en ListadoLab, dando prioridad a ISPT y avisando si hay discrepancias.
+- Muestras no SPT y resultados de laboratorio resumidos disponibles como **capas optativas**, con codigo UG, USCS, IP, RCS donde existan datos. Se guardan los registros completos de ListadoLab en el proyecto.
+- Controles de visibilidad de terreno, sondeos, contactos, rellenos, curvas de penetracion, SPT, muestras, laboratorio y guitarra. Tamano de letra **general, ensayos y guitarra** de 6 a 18 pt; parametros serializados en JSON.
+- Exportaciones HTML, PNG, SVG, PDF y DXF comparten estas capas. En DXF, los SPT, muestras y laboratorio son textos editables en capas CAD especificas.
+- **Solo existe la entrada multifichero**. Se han retirado la plantilla Excel unica, la edicion de tablas de entrada y el inicio automatico con datos demostrativos. Los proyectos JSON guardados siguen siendo recuperables.
 
-## 🌍 Visión general
+## Interfaz v0.8.5
 
-`xslope` integra tres motores de análisis con un único archivo de entrada:
+- Cabecera azul oscuro con operaciones **Nuevo**, **Abrir** (proyecto JSON) y **Guardar** (descarga del proyecto). Nuevo y Abrir solicitan confirmación antes de sustituir trabajo existente. El guardado MiniCAD se mantiene independiente de la descarga del JSON.
+- Pestañas superiores en este orden: **Datos**, **Trazado**, **Perfil**, **Unidades**, **Interpretación** y **Exportar**. Los metadatos y las escalas del proyecto están en un apartado desplegable de **Datos**.
+- Panel **izquierdo** contextual: capas geológicas, capas de ensayos, guitarra y tres tamaños de letra (general, ensayos y guitarra). El perfil y sus exportaciones usan estas preferencias. Las preferencias se restauran correctamente al abrir otro proyecto.
+- Barra horizontal de herramientas del MiniCAD **encima del lienzo**, agrupada en Dibujo, Rellenos y Vista. Incluye seleccionar, dibujar/borrar contacto, dibujar/borrar lentejón, finalizar, rellenar/quitar relleno, limpiar, deshacer/rehacer, mover, encuadrar y ajuste magnético. El desplazamiento con la mano es adicional a **Mayús+arrastrar** y al botón central; el zoom con rueda sigue disponible.
+- Los puntos **STA solo aportan PK/cota a la superficie**: no se dibujan símbolos ni etiquetas STA en el trazado, en el MiniCAD, en el perfil ni en la guitarra. La topografía sigue incluyendo esos datos de forma exacta.
+- **Unidades** permite cambiar **nombre** y **color** con selector visual. El codigo BKFL (`unidad_id`) permanece fijo y permite seguir vinculando intervalos y contactos. Se ha retirado la columna Observaciones de Unidades. Los cambios se guardan en el proyecto JSON y actualizan las zonas clasificadas. La clasificación de polígonos sigue siendo manual en Interpretación.
+- Las modificaciones estéticas no cambian el motor de contactos, cotas, SPT, lectura DPRG, construcción de zonas ni las coordenadas de exportación.
 
-- 🔹 Análisis por equilibrio límite (LEM): incluye siete métodos de rebanadas — Ordinary Method of Slices, Simplified Janbu, Bishop Simplified, Corps of Engineers, Lowe & Karafiath, Spencer y Morgenstern–Price. Soporta superficies circulares y no circulares, búsqueda automática de la superficie crítica, abatimiento rápido, refuerzo, cargas sísmicas y análisis de confiabilidad por Monte Carlo.
-- 💧 Flujo de filtración por elementos finitos: modelado de flujo de agua en medio saturado y no saturado, régimen permanente o transitorio, sobre una malla generada a partir de la misma geometría del talud. Genera el campo de presiones de poros que alimenta los análisis de estabilidad, en lugar de asumir presiones piezométricas simplificadas.
-- 🧱 Estabilidad de taludes por elementos finitos: análisis elastoplástico con criterio de Mohr–Coulomb mediante el método de reducción de resistencia al corte (SRM), permitiendo que el mecanismo de falla emerja de forma natural sin imponer una superficie de falla previa.
+## Instalacion
 
-Los problemas se definen mediante una plantilla en Excel, lo que mantiene un flujo accesible para la práctica profesional, mientras el cálculo y la visualización se realizan en Python. Además, existe una aplicación de escritorio llamada XSLOPE Studio que ofrece una interfaz gráfica para acceder a las mismas capacidades.
-
-## 🧩 Estructura del proyecto
-
-La base del repositorio está organizada de la siguiente manera:
-
-```text
-xslope/
-├── xslope/                  # Núcleo principal del paquete Python
-│   ├── __init__.py
-│   ├── advanced.py
-│   ├── cad.py
-│   ├── fem.py
-│   ├── fileio.py
-│   ├── mesh.py
-│   ├── plot.py
-│   ├── search.py
-│   ├── seep.py
-│   ├── solve.py
-│   ├── summary.py
-│   ├── units.py
-│   ├── reliability.py
-│   └── resources/           # Plantillas y recursos del paquete
-├── docs/                    # Documentación, ejemplos y tutoriales
-├── notebooks/               # Cuadernos de trabajo
-├── studio/                  # Aplicación XSLOPE Studio
-├── test/                    # Pruebas del proyecto
-├── tools/                   # Utilidades y validaciones
-├── packaging/               # Empaquetado y distribución
-├── benchmarks/              # Casos de referencia y comparaciones
-├── README.md                # Este archivo
-├── pyproject.toml           # Configuración del paquete y dependencias
-├── LICENSE.txt              # Licencia Apache 2.0
-├── CHANGELOG.md             # Historial de cambios
-├── CITATION.cff             # Metadatos de citación
-├── mkdocs.yml               # Configuración de la documentación
-└── main_*.py                # Scripts de ejemplo y uso directo
-```
-
-## ⚙️ Instalación
-
-`xslope` requiere Python 3.9 o superior y se publica en PyPI.
+En macOS o Linux, dentro de la carpeta `perfil_geologico`:
 
 ```bash
-pip install xslope
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+python3 -m streamlit run app.py
 ```
 
-Esto instala lo necesario para análisis por equilibrio límite. Los extras opcionales agregan funcionalidades adicionales:
+En Windows, active `.venv\Scripts\activate` y ejecute `python -m pip install -r requirements.txt` y `python -m streamlit run app.py`.
+
+## Procedimiento con varios archivos
+
+1. Abra la pestaña **Datos** y seleccione **Importar campana desde varios archivos Excel**.
+2. Seleccione juntos `PERFIL1.xlsx`, `BKFL.XLSX`, `DPRG.XLSX`, `ISPT.XLSX` y/o `ListadoLab.XLSX`. Los nombres pueden ser diferentes, pero las cabeceras deben coincidir con los formatos reconocidos.
+3. Pulse **Validar archivos**, revise estaciones y advertencias y confirme la sustitucion.
+4. Pulse **Aplicar campana validada**. Las tablas derivadas quedan bloqueadas para impedir inconsistencias con PERFIL1. Para corregir datos, modifique el original y vuelva a importar. La interpretacion anterior se descarta solo tras confirmacion.
+5. En **Trazado**, revise el eje de PK acumulados y la guitarra. El eje es de solo lectura para una campana importada por PK.
+6. En **Interpretación**, utilice la barra MiniCAD horizontal (selección, contactos, lentejones, rellenos, desplazamiento y ajuste magnético).
+7. En **Unidades**, edite los nombres y seleccione los colores a su gusto; guarde para actualizar zonas y leyendas. En **Perfil**, active las capas y ajuste los tamaños de letra desde el panel lateral izquierdo; cambie la escala gráfica de golpes en la zona central.
+8. En **Exportar**, descargue PDF, PNG, SVG, DXF, HTML, Excel o proyecto JSON. Guarde el JSON para poder reabrir la campana y su interpretacion.
+
+La carpeta `ejemplos/campana_multifichero_sintetica/` contiene cinco libros inventados expresamente para probar el importador. No se entrega ninguna plantilla de entrada unica.
+
+## Trazabilidad de los datos
+
+Las tablas internas derivadas que usa el motor (`Sondeos`, `Intervalos`, `Unidades`, `Ensayos_DPSH`, `Lecturas_DPSH`, `Eje`) se mantienen para el motor de GeoPerfil. Ademas, la nueva importacion agrega `Estaciones`, `SPT`, `Muestras`, `Laboratorio`, `Laboratorio_original` y `Fuentes`. Las tablas contienen nombre del archivo, numero de fila e identificadores donde corresponde. `Fuentes` incluye hash SHA-256 del libro; la aplicacion **no guarda los bytes originales del Excel en el JSON**. Conserve sus originales separadamente.
+
+SPT y laboratorio son datos observados de campo/ensayo. Las zonas geologicas dibujadas y clasificadas constituyen interpretacion del tecnico, no medicion de los libros.
+
+## Pruebas
+
+Desde la carpeta superior que contiene `perfil_geologico`:
 
 ```bash
-pip install "xslope[fem]"        # flujo de filtración y análisis por FEM (agrega gmsh)
-pip install "xslope[gui]"        # XSLOPE Studio, aplicación de escritorio
-pip install "xslope[ai]"         # asistente IA del Studio
-pip install "xslope[cad]"        # importación/exportación DXF
-pip install "xslope[gui,fem,ai,cad]"  # todo incluido
+python3 -m pytest -q perfil_geologico/tests
+python3 -m compileall -q perfil_geologico
 ```
 
-Para iniciar la interfaz gráfica:
+La versión **v0.8.5 ha superado 97 pruebas automatizadas** (incluidas las 88 anteriores). Incluye regresiones del importador, topografia con STA, guardado, capas y DXF, ademas de pruebas de navegador del MiniCAD y una prueba integral con los cinco libros aportados en esta conversacion. El DXF fue releido con `ezdxf`; las imagenes fueron generadas y revisadas. No se pudo ejecutar una sesión completa de Streamlit aquí porque Streamlit no estaba instalado y no se pudo descargar sin acceso de red. La regresión específica construye el modelo de MiniCAD con la misma firma de la interfaz mediante un adaptador simulado, y comprueba que no vuelve a darse el TypeError del argumento duplicado. Se comprobó el MiniCAD en Chromium mediante Playwright, incluyendo que las bocas y puntos de inicio estén sobre la línea del terreno, pero no toda la interfaz Streamlit. Debe validarse localmente en macOS antes de usarlo en un trabajo real; la apertura del DXF en AutoCAD sigue pendiente.
 
-```bash
-xslope-studio
-```
+## Correccion v0.8.3: posicion real de los reconocimientos
 
-En Debian/Ubuntu (incluido Google Colab), `gmsh` puede requerir librerías del sistema OpenGL; en ese caso se recomienda ejecutar:
+- Sondeos y penetrómetros comienzan **exactamente en el PK y la Cota indicados en PERFIL1**, sin desplazamiento vertical de la geometría. Los datos de entrada nunca se alteran automáticamente.
+- La cota del terreno de PDF/PNG/SVG se obtiene ahora de **todos los puntos de PERFIL1**, como en MiniCAD, Plotly y DXF. Se ha corregido un error anterior del PDF que utilizaba únicamente cotas de sondeos.
+- Se representa la posición de inicio de cada reconocimiento con una marca de boca y, en el caso del penetrómetro, un eje fino desde la cota de inicio hasta la profundidad final. La curva de golpes sigue comenzando en la **primera lectura real**, normalmente 0,20 m por debajo, sin inventar una lectura N20 a profundidad 0.
+- Los puntos STA contribuyen a la geometría de la línea del terreno **sin símbolos ni etiquetas individuales**.
+- La aplicación verifica diferencias de más de **0,001 m** entre la cota de los reconocimientos y la superficie interpolada de PERFIL1. Si hay discrepancia bloquea la representación para solicitar corrección en el archivo, sin mover el ensayo automáticamente.
+- Se incluyen pruebas de regresión con terreno quebrado, con los Excel aportados por el usuario, la salida DXF y el componente MiniCAD en Chromium.
 
-```bash
-apt-get install -y libgl1 libglu1-mesa
-```
+## Correccion v0.8.5: MiniCAD, guitarra y Unidades
 
-## 🚀 Ejemplo rápido
+- Corregido el **TypeError** al entrar en Interpretación: `modelo_minicad` recibia el argumento `dpsh` como posicional y ademas como keyword. Se ha eliminado esa duplicidad.
+- La guitarra se organiza en **cuatro filas**: PK, cota del terreno, sondeos y penetrómetros. S-01 y P-01 a P-04 aparecen en sus PK exactos, mientras que STA solo afecta a la topografia y no se etiqueta como reconocimiento. Esta estructura es comun a Plotly, PDF, PNG, SVG y DXF.
+- En **Unidades** se editan nombre y color por codigo BKFL. El selector de color incluye una muestra visual y su referencia hexadecimal. Los cambios recolorean las zonas asignadas, se conservan tras guardar/cargar JSON y no alteran los libros Excel originales.
+- Retirada **Observaciones de la tabla Unidades** y añadida migración para abrir los antiguos JSON que la contengan. Esto no suprime las observaciones de campo existentes en los archivos de ensayo originales.
+- 97 pruebas superadas; comprobacion integral con los cinco Excel del caso y lectura de entidades GUITARRA en el DXF. La prueba integrada completa en Streamlit Cloud/Mac queda pendiente.
 
-Un problema se define a partir de un archivo Excel. El siguiente ejemplo carga un archivo de muestra y resuelve un caso simple:
+## Limitaciones importantes
 
-```bash
-curl -O https://raw.githubusercontent.com/njones61/xslope/main/docs/inputs/slope/xslope_simple1.xlsx
-```
+- Las escalas H/V aplican la exageracion en la visualizacion, pero en perfiles muy cortos y profundos la composicion de PDF/PNG/SVG se ajusta para ser legible. **Esa salida ajustada NO garantiza escala fisica de impresion** y se rotula expresamente. Para planos medidos, revise el DXF y su ventana de impresion.
+- Los reconocimientos de PERFIL1 se ubican sobre un **perfil definido por PK**. Esta modalidad no crea coordenadas UTM reales: X se utiliza internamente como PK e Y=0. La entrada clasica con coordenadas XY se ha eliminado de la interfaz; el proyecto usa PK y cotas de PERFIL1.
+- Si solo hay un sondeo litologico BKFL, las superficies fuera del sondeo siguen siendo interpretacion manual; no se infiere continuidad lateral.
+- El terreno se interpola entre cotas de todos los puntos de PERFIL1 (incluido STA); no sustituye un modelo digital del terreno.
+- El nivel freatico indicado como cero en libros de ensayo no se dibuja automaticamente como nivel de agua.
+- Las etiquetas densas pueden solaparse al activar muchas capas y letras grandes. En tal caso desactive capas o reduzca la fuente.
+- El DXF usa coordenadas de perfil X=PK, Y=cota, no coordenadas UTM. Las tramas HATCH de unidades geologicas dependen de la interpretacion que el usuario complete.
+- La aplicacion aun requiere validacion funcional completa con navegador + Streamlit local y revision del perfil por profesional geotecnico.
 
-```python
-from xslope.fileio import load_slope_data
-from xslope.slice import generate_slices
-from xslope.solve import solve_selected
-from xslope.plot import plot_solution
+## Novedades v0.8.4 - contactos hasta los bordes y penetraciones contenidas
 
-slope_data = load_slope_data("xslope_simple1.xlsx")
-
-circle = slope_data['circles'][0]
-success, result = generate_slices(slope_data, circle=circle, num_slices=20)
-slice_df, failure_surface = result
-
-results = solve_selected('bishop', slice_df)
-print(f"FS = {results['FS']:.3f}")
-
-plot_solution(slope_data, slice_df, failure_surface, results)
-```
-
-También es posible buscar la superficie crítica automáticamente:
-
-```python
-from xslope.search import circular_search
-from xslope.plot import plot_circular_search_results
-
-fs_cache, converged, search_path, circle_cache = circular_search(slope_data, 'bishop')
-print(f"minimum FS = {fs_cache[0]['FS']:.3f}")
-
-plot_circular_search_results(slope_data, fs_cache, search_path)
-```
-
-Más ejemplos están disponibles en `docs/inputs/slope/` y la plantilla base puede generarse con:
-
-```python
-from xslope.fileio import default_template_path
-print(default_template_path())
-```
-
-## 📚 Documentación
-
-La documentación completa incluye:
-
-- teoría y fundamentos
-- referencia de plantillas de entrada
-- ejemplos resueltos
-- uso de XSLOPE Studio
-- validación frente a benchmarks publicados
-
-Consulta el sitio oficial:
-
-- https://xslope.org
-- https://xslope.org/en/stable/
-
-## ✅ Calidad, validación y contribución
-
-El proyecto cuenta con una suite de validación y mecanismos para verificar resultados frente a referencias publicadas. Además, se mantiene una estructura pensada para desarrolladores y usuarios avanzados.
-
-Si deseas contribuir:
-
-1. Haz un fork del repositorio.
-2. Crea una rama de trabajo.
-3. Realiza cambios documentados y pruebas relevantes.
-4. Envía un pull request con una descripción clara del problema y la solución.
-
-## 🤝 Soporte y solicitudes
-
-Para preguntas, errores o nuevas funcionalidades puedes abrir un issue en GitHub:
-
-- https://github.com/njones61/xslope/issues
-
-Si no puedes compartir información pública o no dispones de cuenta en GitHub, también se puede contactar por correo:
-
-- njones@byu.edu
-- xslope@jonesgeo.com
-
-## 📌 Citas
-
-Si usas `xslope` en trabajo publicado, por favor cita el artículo:
-
-> Jones, N. L., & Williams, G. P. (2026). xslope: An open, validated Python package and desktop application for integrated seepage and slope stability analysis. SoftwareX, 36, 103018.
-
-También se incluye la referencia bibliográfica en formato machine-readable en:
-
-- `CITATION.cff`
-
-## 🧾 Licencia
-
-Este proyecto se distribuye bajo la licencia Apache License, Version 2.0. Consulta el archivo [LICENSE.txt](LICENSE.txt) para más detalles.
-
-## ©️ Copyright
-
-Copyright 2025 Norman L. Jones
-
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
-
-```text
-http://www.apache.org/licenses/LICENSE-2.0
-```
-
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
----
-
-<p align="center">
-  <b>XSLOPE</b> — análisis integrado de flujo y estabilidad de taludes
-</p>
+- El MiniCAD permite terminar contactos en la topografia, en el borde izquierdo,
+  el derecho y el limite inferior sin sobrepasarlos. Las guias azules aparecen
+  durante el modo de dibujo y permiten captura exacta a cualquier nivel de zoom.
+- Las curvas N20 se ajustan automaticamente al espacio disponible sin cambiar
+  el PK del penetrómetro, la cota de inicio ni las lecturas. El ensayo extremo
+  derecho puede dibujar su curva hacia la izquierda. La escala horizontal de
+  **representacion de golpes** puede reducirse respecto a la solicitada para
+  respetar los limites del perfil.
+- Los valores observados siempre tienen prioridad en la captura magnetica.
+- Consulte `CAMBIOS_v0.8.4.md` y ejecute `pytest -q` antes de uso.
